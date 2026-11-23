@@ -93,6 +93,24 @@ const TIPS = {
 };
 
 // ---------------------------------------------------------------- state
+// Extra sample reviews that trickle into the boards while the app is open (all marked "sample")
+const SAMPLE_POOL = [
+  { author: 'Maya', e: '🌸', category: 'beauty', item: 'Silk pillowcase', vote: 'worth', art: '🛏️', text: 'Hair is less frizzy and it’s held up to 40 washes. $1.10 per night so far. Obsessed.' },
+  { author: 'Jordan', e: '🎧', category: 'tech', item: 'Smart ring', vote: 'overhyped', art: '💍', text: 'Cool for a week. Now it lives in a drawer. My phone already tracks steps 🙃' },
+  { author: 'Priya', e: '✈️', category: 'travel', item: 'Lisbon in March', vote: 'worth', art: '🚋', text: 'Flights were $410, food is cheap, and the light is unreal. Still talk about it weekly.' },
+  { author: 'Leo', e: '🍜', category: 'food', item: 'Viral smash burger spot', vote: 'overhyped', art: '🍔', text: '45 minute line for a burger that was… fine. The fries were the best part.' },
+  { author: 'Maya', e: '🌸', category: 'clothing', item: 'Linen wide-leg pants', vote: 'worth', art: '👖', text: 'Wore them 3x a week all summer. Cost per wear is basically nothing now.' },
+  { author: 'Jordan', e: '🎧', category: 'subs', item: 'Music streaming family plan', vote: 'worth', art: '🎶', text: 'Split 5 ways = $3.40 each. Used every single day. Easiest yes ever.' },
+  { author: 'Priya', e: '✈️', category: 'experiences', item: 'Hot air balloon ride', vote: 'worth', art: '🎈', text: 'Expensive, but I will remember floating over those valleys forever.' },
+  { author: 'Leo', e: '🍜', category: 'home', item: 'Stand mixer', vote: 'ask', art: '🧁', text: 'On sale for $280. I bake maybe twice a month. Is it worth the counter space?' },
+  { author: 'Maya', e: '🌸', category: 'beauty', item: '$90 vitamin C serum', vote: 'overhyped', art: '🧴', text: 'Switched to a $14 one after 2 months. Honestly can’t tell the difference.' },
+  { author: 'Jordan', e: '🎧', category: 'tech', item: 'E-reader', vote: 'worth', art: '📚', text: 'Read 19 books this year vs 4 last year. Best $130 I’ve spent.' },
+  { author: 'Priya', e: '✈️', category: 'clothing', item: 'Packable rain jacket', vote: 'worth', art: '🧥', text: 'Survived 6 trips and a monsoon. Folds into its own pocket.' },
+  { author: 'Leo', e: '🍜', category: 'subs', item: 'Meal kit subscription', vote: 'overhyped', art: '🥡', text: 'Did the math: $12 a plate and I still went grocery shopping. Cancelled.' },
+  { author: 'Maya', e: '🌸', category: 'home', item: 'Sunset lamp', vote: 'ask', art: '🌅', text: 'Everyone on my feed has one. Does it actually make the room nicer or is it a fad?' },
+  { author: 'Jordan', e: '🎧', category: 'experiences', item: 'Concert floor tickets', vote: 'worth', art: '🎤', text: 'Pricey, but singing every word 10 feet from the stage? Zero regrets.' },
+];
+
 const SAMPLE_MEMBERS = [
   { id: 'm1', name: 'Maya', e: '🌸', bio: 'Skincare minimalist. Hates waste.' },
   { id: 'm2', name: 'Jordan', e: '🎧', bio: 'Tests every gadget so you don’t have to.' },
@@ -127,6 +145,8 @@ function seed() {
       ],
     },
     dmRead: {},
+    look: { mode: 'daily', pick: 'liquid', rotation: ['liquid', 'fractal', 'emerald', 'aurora', 'citrus', 'lagoon', 'paris', 'beach', 'tokyo', 'alps'], photo: null, sound: true },
+    poolIdx: 0,
     following: ['m1'],
   };
 }
@@ -135,7 +155,14 @@ let S = load();
 function load() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return Object.assign(seed(), JSON.parse(raw));
+    if (raw) {
+      const base = seed(), data = JSON.parse(raw);
+      const out = Object.assign(base, data);
+      out.look = Object.assign(seed().look, data.look || {});   // fill in any missing look settings
+      if (!Array.isArray(out.look.rotation) || !out.look.rotation.length) out.look.rotation = seed().look.rotation;
+      out.profile = Object.assign(seed().profile, data.profile || {});
+      return out;
+    }
   } catch (e) { /* fall through */ }
   return seed();
 }
@@ -229,6 +256,7 @@ function go(t) {
 }
 
 function render() {
+  todayLook = applyBackground(S.look);
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   $('.avatar').innerHTML = myFace();
   const v = $('#view');
@@ -236,6 +264,8 @@ function render() {
   $('.tabs [data-tab="community"]').classList.toggle('has-dot', unreadCount() > 0);
   if (sheet) renderSheet();
 }
+
+let todayLook = null;
 
 // ---------------------------------------------------------------- HOME
 let installEvt = null;
@@ -255,7 +285,7 @@ function viewHome() {
   const spent = monthSpend();
   const budget = S.profile.budget || 0;
   const pct = budget ? Math.min(100, (spent / budget) * 100) : 0;
-  const trending = [...S.posts].sort((a, b) => (b.likes + b.comments.length * 2) - (a.likes + a.comments.length * 2)).slice(0, 2);
+  const trending = [...S.posts].sort((a, b) => (b.likes + b.comments.length * 2) - (a.likes + a.comments.length * 2)).slice(0, 8);
   const recent = [...S.items].sort((a, b) => b.createdAt - a.createdAt).slice(0, 3);
   const hr = new Date().getHours();
   const hello = hr < 12 ? 'Good morning' : hr < 18 ? 'Hey there' : 'Good evening';
@@ -273,6 +303,7 @@ function viewHome() {
 
   return `
     <div class="hero">
+      <button class="today-chip" data-action="look">${todayLook ? todayLook.e + ' Today: ' + todayLook.name : '🎨 Background'} · change</button>
       <h1>${hello}${name}! 👋</h1>
       <p>Thinking about buying something? Find out if it’s really worth it in under a minute.</p>
       <button class="btn" data-action="start-test">🧪 Take the Regret Test</button>
@@ -288,8 +319,8 @@ function viewHome() {
       <div class="small muted" style="margin-top:6px">${spent > budget ? `You’re ${money(spent - budget)} over budget this month.` : `${money(budget - spent)} left to spend this month.`}</div>
     </div>` : ''}
     ${install}
-    <div class="section-title">🔥 Hot on the boards <button data-action="tab" data-to="community">See all</button></div>
-    ${trending.map(postCard).join('')}
+    <div class="section-title"><span><span class="live-dot"></span>Circulating reviews</span> <button data-action="tab" data-to="community">See board</button></div>
+    ${reviewMarquee(trending)}
     <div class="section-title">🕒 Recently added <button data-action="tab" data-to="items">My stuff</button></div>
     ${recent.length ? recent.map(itemRow).join('') : `<div class="card empty"><div class="big">🛍️</div><b>Nothing here yet</b>Take the Regret Test on something you’re eyeing and it’ll show up here.</div>`}
   `;
@@ -344,7 +375,7 @@ function ringSvg(score, cls) {
   const r = 78, c = 2 * Math.PI * r, off = c * (1 - score / 100);
   const color = { good: 'var(--good)', mid: 'var(--mid)', bad: 'var(--bad)' }[cls];
   return `<div class="ring"><svg width="180" height="180" viewBox="0 0 180 180" aria-hidden="true">
-      <circle cx="90" cy="90" r="${r}" fill="none" stroke="#f1f5ea" stroke-width="18"/>
+      <circle cx="90" cy="90" r="${r}" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="18"/>
       <circle cx="90" cy="90" r="${r}" fill="none" stroke="${color}" stroke-width="18" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}"/>
     </svg><div class="num"><div>${score}<small>out of 100</small></div></div></div>`;
 }
@@ -500,18 +531,64 @@ function barChart(months, budget) {
     const top = y(m.total), h = Math.max(m.total ? 3 : 0, H - 24 - top);
     const last = i === months.length - 1;
     const over = budget && m.total > budget;
-    bars += `<rect x="${x}" y="${H - 24 - h}" width="${bw}" height="${h}" rx="8" fill="${over ? '#f0442b' : last ? 'url(#g)' : '#b9e5a0'}"/>
-      <text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" font-size="11" font-weight="700" fill="#6c7a68">${m.label}</text>
-      ${m.total ? `<text x="${x + bw / 2}" y="${H - 30 - h}" text-anchor="middle" font-size="10" font-weight="800" fill="#1d2b1f">${m.total >= 1000 ? '$' + (m.total / 1000).toFixed(1) + 'k' : '$' + Math.round(m.total)}</text>` : ''}`;
+    bars += `<rect x="${x}" y="${H - 24 - h}" width="${bw}" height="${h}" rx="8" fill="${over ? '#ff5a3c' : last ? 'url(#g)' : 'rgba(139,224,74,.55)'}"/>
+      <text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" font-size="11" font-weight="700" fill="rgba(234,240,230,.7)">${m.label}</text>
+      ${m.total ? `<text x="${x + bw / 2}" y="${H - 30 - h}" text-anchor="middle" font-size="10" font-weight="800" fill="#fff">${m.total >= 1000 ? '$' + (m.total / 1000).toFixed(1) + 'k' : '$' + Math.round(m.total)}</text>` : ''}`;
   });
-  const bl = budget ? `<line x1="${pad - 6}" x2="${W - pad + 6}" y1="${y(budget)}" y2="${y(budget)}" stroke="#ff6b1a" stroke-width="2" stroke-dasharray="5 5"/>` : '';
+  const bl = budget ? `<line x1="${pad - 6}" x2="${W - pad + 6}" y1="${y(budget)}" y2="${y(budget)}" stroke="#ffb02e" stroke-width="2" stroke-dasharray="5 5"/>` : '';
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Spending per month for the last six months">
     <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6b1a"/><stop offset="1" stop-color="#ffa62b"/></linearGradient></defs>
-    <line x1="${pad - 6}" x2="${W - pad + 6}" y1="${H - 24}" y2="${H - 24}" stroke="#e9eee0"/>
+    <line x1="${pad - 6}" x2="${W - pad + 6}" y1="${H - 24}" y2="${H - 24}" stroke="rgba(255,255,255,.2)"/>
     ${bars}${bl}</svg>`;
 }
 
 // ---------------------------------------------------------------- COMMUNITY
+const PIN_GRADS = [['#ff6a14', '#ffb02e'], ['#15b85c', '#8be04a'], ['#0c8e7c', '#2fe0b0'], ['#ff3d2e', '#ffb02e'], ['#6c2a6e', '#ff6a3d'], ['#1a6dff', '#2fe0b0'], ['#ffb02e', '#8be04a'], ['#2d1b69', '#ff7a3d']];
+function hashStr(t) { let h = 7; for (const c of String(t)) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); }
+const VOTE_LABEL = { worth: '✅ Worth it', overhyped: '🚫 Overhyped', ask: '🤔 Asking' };
+function pinArt(p, small) {
+  const h = hashStr(p.id + p.item), g = PIN_GRADS[h % PIN_GRADS.length];
+  const ht = small ? 120 : [150, 200, 240, 170, 210][h % 5];
+  return `<div class="pin-art" style="height:${ht}px;background:radial-gradient(120% 80% at 20% 10%, rgba(255,255,255,.4), transparent 50%),linear-gradient(135deg,${g[0]},${g[1]})"><span>${p.art || cat(p.category).e}</span></div>`;
+}
+function pinCard(p) {
+  return `<button class="pin${freshIds.has(p.id) ? ' fresh' : ''}" data-action="open-post" data-id="${p.id}">
+    ${p.photo ? `<img class="pin-img" src="${p.photo}" alt="${esc(p.item)}">` : pinArt(p)}
+    <div class="pin-body"><span class="tag ${p.vote}">${VOTE_LABEL[p.vote]}</span>${p.sample ? ' <span class="tag sample">sample</span>' : ''}
+      <div class="pin-title">${esc(p.item)}</div>
+      <p class="pin-text">${esc(p.text)}</p>
+      <div class="pin-foot"><span class="pav">${face(p)}</span><span class="ellipsis">${esc(p.author)}</span><span class="likes">${p.liked ? '❤️' : '🤍'} ${p.likes}</span></div>
+    </div></button>`;
+}
+function reviewMarquee(list) {
+  if (!list.length) return `<div class="card empty"><div class="big">🌀</div><b>No reviews yet</b>Post the first one on the boards.</div>`;
+  const cards = list.map(p => `<button class="review-card glass" data-action="open-post" data-id="${p.id}">
+      <div class="row"><span class="pav">${face(p)}</span><div class="grow"><b class="ellipsis" style="display:block;font-size:13px">${esc(p.author)}</b><span class="tag ${p.vote}" style="font-size:10px;padding:1px 7px">${VOTE_LABEL[p.vote]}</span></div><span class="small muted">${p.liked ? '❤️' : '🤍'} ${p.likes}</span></div>
+      <div class="pin-title">${esc(p.item)}</div><p>${esc(p.text)}</p></button>`).join('');
+  return `<div class="marquee"><div class="marquee-track" style="animation-duration:${Math.max(24, list.length * 7)}s">${cards}${cards}</div></div>`;
+}
+
+// ---------------------------------------------------------------- live feed
+// New sample reviews drip in while the app is open, and sample posts collect likes,
+// so the board feels alive in this preview. A real server would replace this.
+const freshIds = new Set();
+let pendingNew = 0;
+function liveTick() {
+  const idx = S.poolIdx || 0;
+  if (idx < SAMPLE_POOL.length && Math.random() < 0.6) {
+    const src = SAMPLE_POOL[idx];
+    const post = { id: uid(), sample: true, likes: Math.floor(Math.random() * 6), liked: false, at: Date.now(), comments: [], ...src };
+    S.posts.push(post); S.poolIdx = idx + 1; freshIds.add(post.id); setTimeout(() => freshIds.delete(post.id), 4000);
+    const onBoard = tab === 'community' && commSeg === 'boards' && !sheet;
+    if (onBoard && window.scrollY > 200) { pendingNew++; save(); render(); }
+    else { save(); if (!sheet && (tab === 'home' || tab === 'community')) render(); }
+  } else {
+    const samples = S.posts.filter(p => p.sample);
+    if (samples.length) { samples[(Math.random() * samples.length) | 0].likes++; save(); if (!sheet && (tab === 'home' || tab === 'community')) render(); }
+  }
+}
+setInterval(() => { if (document.visibilityState === 'visible') liveTick(); }, 22000);
+
 function postCard(p) {
   const voteLabel = { worth: '✅ Worth it', overhyped: '🚫 Overhyped', ask: '🤔 Asking' }[p.vote];
   return `<div class="post">
@@ -537,7 +614,9 @@ function viewCommunity() {
     body = `
       <div class="chips"><button class="chip ${boardCat === 'all' ? 'on' : ''}" data-action="board-cat" data-cat="all">All</button>
         ${CATS.map(c => `<button class="chip ${boardCat === c.id ? 'on' : ''}" data-action="board-cat" data-cat="${c.id}">${c.e} ${c.label}</button>`).join('')}</div>
-      ${posts.length ? posts.map(postCard).join('') : `<div class="card empty"><div class="big">📭</div><b>No posts in this board yet</b>Be the first — tap + to share an opinion.</div>`}
+      ${pendingNew ? `<div class="live-pill"><button data-action="see-new"><span class="live-dot"></span>${pendingNew} new review${pendingNew === 1 ? '' : 's'} ↑</button></div>` : ''}
+      ${posts.length ? `<div class="masonry">${posts.map(pinCard).join('')}</div><div class="feed-end"><span class="live-dot"></span>Live · new reviews appear here as they’re posted</div>`
+        : `<div class="card empty"><div class="big">📭</div><b>No posts in this board yet</b>Be the first — tap + to share an opinion.</div>`}
       <button class="fab" data-action="new-post" aria-label="New post">+</button>`;
   } else if (commSeg === 'messages') {
     body = viewInbox();
@@ -717,13 +796,43 @@ function sendMsg(id, fields) {
   save(); buzz(8);
 }
 
+function sheetLook() {
+  const L = S.look, cur = todaysTheme(L);
+  const groups = ['Reflective', 'Colors', 'Places'];
+  const tile = t => {
+    const inRot = L.rotation.includes(t.id);
+    const on = L.mode === 'daily' ? inRot : L.mode === 'fixed' && L.pick === t.id;
+    return `<button class="bg-opt ${on ? 'on' : ''} ${inRot ? 'in' : ''}" data-action="bg-tile" data-id="${t.id}" aria-pressed="${on}">
+      <div class="sw">${backgroundHtml(t.id, L)}</div>
+      ${L.mode === 'daily' ? `<span class="check">${inRot ? '✓' : ''}</span>` : ''}<b>${t.e} ${t.name}</b></button>`;
+  };
+  return {
+    title: '🎨 Background & sound',
+    body: `<p class="small muted" style="margin-top:0">Today: <b style="color:#fff">${cur.e} ${cur.name}</b></p>
+      <div class="seg">
+        <button class="${L.mode === 'daily' ? 'on' : ''}" data-action="bg-mode" data-m="daily">🔀 New every day</button>
+        <button class="${L.mode === 'fixed' ? 'on' : ''}" data-action="bg-mode" data-m="fixed">📌 Keep one</button>
+        <button class="${L.mode === 'photo' ? 'on' : ''}" data-action="bg-mode" data-m="photo">📷 My photo</button>
+      </div>
+      ${L.mode === 'daily' ? '<p class="small muted">Tap to choose which backgrounds go into your daily shuffle. A different one shows each day.</p>' : ''}
+      ${L.mode === 'fixed' ? '<p class="small muted">Tap the one you want to keep.</p>' : ''}
+      ${L.mode === 'photo' ? `<label class="photo-pick">📷 ${L.photo ? 'Change background photo' : 'Choose a background photo'}<input type="file" accept="image/*" data-bg-photo></label>
+        ${L.photo ? `<img class="photo-preview" src="${L.photo}" alt="Your background">` : ''}`
+      : groups.map(g => `<div class="bg-group">${g}</div><div class="bg-grid">${THEMES.filter(t => t.group === g).map(tile).join('')}</div>`).join('')}
+      <div class="section-title">Sound</div>
+      <label class="toggle-row"><div class="grow"><b>✨ Chime when the app opens</b><div class="small muted">Plays when you tap in on the opening screen.</div></div>
+        <input type="checkbox" data-sound ${L.sound ? 'checked' : ''}><span class="switch" aria-hidden="true"></span></label>
+      <button class="btn ghost block" data-action="test-chime">🔔 Play the chime</button>`,
+  };
+}
+
 // ---------------------------------------------------------------- SHEETS
 let sheet = null; // { type, id }
 function openSheet(type, id) { sheet = { type, id }; renderSheet(); }
 function closeSheet() { sheet = null; $('#sheet-root').innerHTML = ''; document.body.style.overflow = ''; }
 function renderSheet() {
   const root = $('#sheet-root');
-  const fn = { item: sheetItem, post: sheetPost, newPost: sheetNewPost, addItem: sheetAddItem, profile: sheetProfile, thread: sheetThread, compose: sheetCompose }[sheet.type];
+  const fn = { item: sheetItem, post: sheetPost, newPost: sheetNewPost, addItem: sheetAddItem, profile: sheetProfile, thread: sheetThread, compose: sheetCompose, look: sheetLook }[sheet.type];
   const out = fn && fn(sheet.id);
   if (!out) return closeSheet();
   if (out.full) {
@@ -889,7 +998,8 @@ function sheetProfile() {
           <input type="checkbox" name="receipts" ${S.profile.receipts !== false ? 'checked' : ''}><span class="switch" aria-hidden="true"></span></label>` : ''}
         <button class="btn block" type="submit">${S.onboarded ? 'Save' : 'Let’s go! ✨'}</button>
       </form>
-      ${S.onboarded ? `<div class="section-title">Your data</div>
+      ${S.onboarded ? `<button class="btn ghost block" style="margin-top:6px" data-action="look">🎨 Background & sound</button>
+      <div class="section-title">Your data</div>
       <p class="small muted" style="margin-top:0">Everything is stored on this phone only. Nothing is sent anywhere.</p>
       <div class="btn-row"><button class="btn ghost small" data-action="export">⬇️ Export backup</button>
         <label class="btn ghost small" style="position:relative;overflow:hidden">⬆️ Restore backup<input type="file" accept="application/json,.json" data-import style="position:absolute;inset:0;opacity:0"></label></div>
@@ -999,6 +1109,22 @@ const actions = {
   },
   compose: () => openSheet('compose'),
   'board-cat': el => { boardCat = el.dataset.cat; render(); },
+  look: () => openSheet('look'),
+  'see-new': () => { pendingNew = 0; window.scrollTo({ top: 0, behavior: 'smooth' }); render(); },
+  'bg-mode': el => {
+    S.look.mode = el.dataset.m; save(); render();
+    if (S.look.mode === 'photo' && !S.look.photo) setTimeout(() => $('[data-bg-photo]')?.click(), 50);
+  },
+  'bg-tile': el => {
+    const id = el.dataset.id, L = S.look;
+    if (L.mode === 'fixed') L.pick = id;
+    else {
+      if (L.rotation.includes(id)) { if (L.rotation.length === 1) { toast('Keep at least one in the shuffle'); return; } L.rotation = L.rotation.filter(x => x !== id); }
+      else L.rotation = [...L.rotation, id];
+    }
+    save(); render();
+  },
+  'test-chime': () => { playChime(); buzz([10, 40, 10]); },
   'demo-ok': () => { localStorage.setItem('wth-demo-ok', '1'); render(); },
   like: el => {
     const p = S.posts.find(x => x.id === el.dataset.id);
@@ -1032,7 +1158,7 @@ const actions = {
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   },
   'clear-samples': () => { S.posts = S.posts.filter(p => !p.sample); S.chat = S.chat.filter(m => m.mine);
-    for (const k in S.dms) { S.dms[k] = S.dms[k].filter(m => !m.sample); if (!S.dms[k].length) delete S.dms[k]; } save(); render(); toast('Sample posts removed'); },
+    S.poolIdx = SAMPLE_POOL.length; for (const k in S.dms) { S.dms[k] = S.dms[k].filter(m => !m.sample); if (!S.dms[k].length) delete S.dms[k]; } save(); render(); toast('Sample posts removed'); },
   reset: () => {
     if (!confirm('Erase all your items, posts and settings from this phone? This can’t be undone.')) return;
     localStorage.removeItem(KEY); S = seed(); closeSheet(); test = newTest(); go('home'); setTimeout(() => openSheet('profile'), 300);
@@ -1113,6 +1239,12 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', async e => {
   const inp = e.target;
+  if (inp.hasAttribute('data-sound')) { S.look.sound = inp.checked; save(); if (inp.checked) playChime(); return; }
+  if (inp.hasAttribute('data-bg-photo') && inp.files[0]) {
+    try { S.look.photo = await compressImage(inp.files[0], 1200); S.look.mode = 'photo'; save(); render(); toast('Background set 📷'); }
+    catch (err) { toast('Couldn’t read that photo'); }
+    return;
+  }
   if (inp.hasAttribute('data-pfp') && inp.files[0]) {
     try {
       const f = $('[data-form="profile"]'); if (f) S.profile.name = f.name.value;
@@ -1145,7 +1277,7 @@ document.addEventListener('change', async e => {
     try {
       const data = JSON.parse(await inp.files[0].text());
       if (!data || !Array.isArray(data.items)) throw new Error('not a backup');
-      S = Object.assign(seed(), data); save(); closeSheet(); render(); toast('Backup restored');
+      localStorage.setItem(KEY, JSON.stringify(data)); S = load(); closeSheet(); render(); toast('Backup restored');
     } catch (err) { toast('That file isn’t a Worth the Hype? backup'); }
   }
 });
@@ -1158,5 +1290,30 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
 
+// ---------------------------------------------------------------- splash + chime
+// Phones only allow sound after a tap, so the opening screen asks for one when the chime is on.
+function showSplash() {
+  const sp = $('#splash'); if (!sp) return;
+  const t = todaysTheme(S.look);
+  $('#splash-sub').textContent = `${t.e} Today’s vibe: ${t.name}`;
+  $('#splash-tap').style.display = S.look.sound ? '' : 'none';
+  sp.classList.remove('gone');
+  if (!S.look.sound) setTimeout(enterApp, 1300);
+}
+function enterApp() {
+  const sp = $('#splash'); if (!sp || sp.classList.contains('gone')) return;
+  if (S.look.sound) playChime();
+  buzz(12);
+  sp.classList.add('gone');
+  if (!S.onboarded) setTimeout(() => openSheet('profile'), 450);
+}
+$('#splash').addEventListener('click', enterApp);
+$('#splash').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') enterApp(); });
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') hiddenAt = Date.now();
+  else if (hiddenAt && Date.now() - hiddenAt > 5 * 60000) { render(); showSplash(); } // reopening after a while
+});
+
 render();
-if (!S.onboarded) setTimeout(() => openSheet('profile'), 250);
+showSplash();

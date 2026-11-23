@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#ff6b1a">
+  <meta name="theme-color" content="#06080c">
   <meta name="description" content="Find out if a purchase is actually worth your money.">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -16,6 +16,15 @@
   <title>Worth the Hype?</title>
 </head>
 <body>
+  <div id="bg" aria-hidden="true"></div>
+  <div id="splash" role="button" tabindex="0" aria-label="Tap to open Worth the Hype?">
+    <div>
+      <div class="splash-orb"></div>
+      <div class="splash-logo">Worth the<br>Hype?</div>
+      <div class="splash-sub" id="splash-sub"></div>
+      <div class="splash-tap" id="splash-tap">Tap to enter ✨</div>
+    </div>
+  </div>
   <header class="top">
     <div class="brand">Worth the Hype<span>?</span></div>
     <button class="avatar" data-action="profile" aria-label="Your profile and settings">🙂</button>
@@ -33,6 +42,7 @@
 
   <div id="sheet-root"></div>
   <div id="toast" role="status" aria-live="polite"></div>
+  <script src="themes.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
