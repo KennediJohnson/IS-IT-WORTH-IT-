@@ -1,6 +1,6 @@
 // Offline support: keep the whole app in a cache so it opens with no connection.
 // Bump VERSION whenever you change any app file so phones pick up the update.
-const VERSION = 'wth-v5';
+const VERSION = 'wth-v7';
 const FILES = [
   './', './index.html', './styles.css', './app.js', './manifest.webmanifest',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',

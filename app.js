@@ -194,6 +194,26 @@ function compressImage(file, max = 720) {
   });
 }
 
+// Center-crop a photo to a small square for profile pictures
+function squareImage(file, size = 320) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const side = Math.min(img.width, img.height);
+      const c = document.createElement('canvas'); c.width = c.height = size;
+      c.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.8));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('bad image')); };
+    img.src = url;
+  });
+}
+// Your avatar: profile photo if you added one, otherwise your emoji
+const myFace = () => S.profile.photo ? `<img src="${S.profile.photo}" alt="">` : esc(S.profile.e || '🙂');
+const face = x => x.mine ? myFace() : esc(x.e || '🙂');
+
 // ---------------------------------------------------------------- routing
 let tab = (location.hash || '#home').slice(1);
 if (!['home', 'test', 'items', 'spend', 'community'].includes(tab)) tab = 'home';
@@ -210,7 +230,7 @@ function go(t) {
 
 function render() {
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
-  $('.avatar').textContent = S.profile.e || '🙂';
+  $('.avatar').innerHTML = myFace();
   const v = $('#view');
   v.innerHTML = ({ home: viewHome, test: viewTest, items: viewItems, spend: viewSpend, community: viewCommunity })[tab]();
   $('.tabs [data-tab="community"]').classList.toggle('has-dot', unreadCount() > 0);
@@ -324,7 +344,7 @@ function ringSvg(score, cls) {
   const r = 78, c = 2 * Math.PI * r, off = c * (1 - score / 100);
   const color = { good: 'var(--good)', mid: 'var(--mid)', bad: 'var(--bad)' }[cls];
   return `<div class="ring"><svg width="180" height="180" viewBox="0 0 180 180" aria-hidden="true">
-      <circle cx="90" cy="90" r="${r}" fill="none" stroke="#efe2d1" stroke-width="18"/>
+      <circle cx="90" cy="90" r="${r}" fill="none" stroke="#f1f5ea" stroke-width="18"/>
       <circle cx="90" cy="90" r="${r}" fill="none" stroke="${color}" stroke-width="18" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}"/>
     </svg><div class="num"><div>${score}<small>out of 100</small></div></div></div>`;
 }
@@ -480,14 +500,14 @@ function barChart(months, budget) {
     const top = y(m.total), h = Math.max(m.total ? 3 : 0, H - 24 - top);
     const last = i === months.length - 1;
     const over = budget && m.total > budget;
-    bars += `<rect x="${x}" y="${H - 24 - h}" width="${bw}" height="${h}" rx="8" fill="${over ? '#b5492f' : last ? 'url(#g)' : '#d9c3a5'}"/>
-      <text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" font-size="11" font-weight="700" fill="#8a7462">${m.label}</text>
-      ${m.total ? `<text x="${x + bw / 2}" y="${H - 30 - h}" text-anchor="middle" font-size="10" font-weight="800" fill="#3b2a20">${m.total >= 1000 ? '$' + (m.total / 1000).toFixed(1) + 'k' : '$' + Math.round(m.total)}</text>` : ''}`;
+    bars += `<rect x="${x}" y="${H - 24 - h}" width="${bw}" height="${h}" rx="8" fill="${over ? '#f0442b' : last ? 'url(#g)' : '#b9e5a0'}"/>
+      <text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" font-size="11" font-weight="700" fill="#6c7a68">${m.label}</text>
+      ${m.total ? `<text x="${x + bw / 2}" y="${H - 30 - h}" text-anchor="middle" font-size="10" font-weight="800" fill="#1d2b1f">${m.total >= 1000 ? '$' + (m.total / 1000).toFixed(1) + 'k' : '$' + Math.round(m.total)}</text>` : ''}`;
   });
-  const bl = budget ? `<line x1="${pad - 6}" x2="${W - pad + 6}" y1="${y(budget)}" y2="${y(budget)}" stroke="#c8643b" stroke-width="2" stroke-dasharray="5 5"/>` : '';
+  const bl = budget ? `<line x1="${pad - 6}" x2="${W - pad + 6}" y1="${y(budget)}" y2="${y(budget)}" stroke="#ff6b1a" stroke-width="2" stroke-dasharray="5 5"/>` : '';
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Spending per month for the last six months">
-    <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c8643b"/><stop offset="1" stop-color="#d9953f"/></linearGradient></defs>
-    <line x1="${pad - 6}" x2="${W - pad + 6}" y1="${H - 24}" y2="${H - 24}" stroke="#e6d8c6"/>
+    <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6b1a"/><stop offset="1" stop-color="#ffa62b"/></linearGradient></defs>
+    <line x1="${pad - 6}" x2="${W - pad + 6}" y1="${H - 24}" y2="${H - 24}" stroke="#e9eee0"/>
     ${bars}${bl}</svg>`;
 }
 
@@ -495,7 +515,7 @@ function barChart(months, budget) {
 function postCard(p) {
   const voteLabel = { worth: '✅ Worth it', overhyped: '🚫 Overhyped', ask: '🤔 Asking' }[p.vote];
   return `<div class="post">
-    <div class="post-head"><div class="pav">${p.e}</div><div class="grow"><b>${esc(p.author)}</b>${p.mine ? '' : ''}<small>${cat(p.category).e} ${cat(p.category).label} · ${ago(p.at)}</small></div>
+    <div class="post-head"><div class="pav">${face(p)}</div><div class="grow"><b>${esc(p.author)}</b>${p.mine ? '' : ''}<small>${cat(p.category).e} ${cat(p.category).label} · ${ago(p.at)}</small></div>
       <span class="tag ${p.vote}">${voteLabel}</span></div>
     <div class="item-name">${esc(p.item)}</div>
     <p>${esc(p.text)}</p>
@@ -815,7 +835,7 @@ function sheetPost(id) {
     body: `${postCard(p)}
       <div class="card">
         <h3>${p.comments.length} comment${p.comments.length === 1 ? '' : 's'}</h3>
-        ${p.comments.map(c => `<div class="comment"><div class="pav">${c.e}</div><div class="grow"><b>${esc(c.author)}</b> <span class="small muted">${ago(c.at)}</span><p>${esc(c.text)}</p></div></div>`).join('')}
+        ${p.comments.map(c => `<div class="comment"><div class="pav">${face(c)}</div><div class="grow"><b>${esc(c.author)}</b> <span class="small muted">${ago(c.at)}</span><p>${esc(c.text)}</p></div></div>`).join('')}
         <form data-form="comment" data-id="${p.id}" class="row" style="margin-top:10px;gap:8px" autocomplete="off">
           <input class="input grow" name="text" required maxlength="300" placeholder="Add your take…" aria-label="Comment">
           <button class="btn small" type="submit" style="min-height:50px">Post</button>
@@ -854,8 +874,15 @@ function sheetProfile() {
     body: `${!S.onboarded ? `<p class="muted" style="margin-top:0">Worth the Hype? helps you decide if something is worth buying — using your own answers, not ads or algorithms. Two quick things and you’re in:</p>` : ''}
       <form data-form="profile" autocomplete="off">
         <label class="field"><span>Your name</span><input class="input" name="name" maxlength="30" placeholder="What should we call you?" value="${esc(p.name)}"></label>
-        <div class="field"><span style="display:block;font-weight:700;font-size:14px;margin-bottom:6px">Pick an avatar</span>
-          <div class="emoji-pick">${AVATARS.map(a => `<button type="button" class="${p.e === a ? 'on' : ''}" data-action="pick-emoji" data-e="${a}" aria-label="Avatar ${a}">${a}</button>`).join('')}</div></div>
+        <div class="field"><span style="display:block;font-weight:700;font-size:14px;margin-bottom:6px">Profile picture</span>
+          <div class="pfp-row">
+            <div class="pfp">${myFace()}</div>
+            <div class="grow">
+              <label class="btn small purple pfp-btn">📷 ${p.photo ? 'Change photo' : 'Upload a photo'}<input type="file" accept="image/*" data-pfp></label>
+              ${p.photo ? `<button type="button" class="backlink" data-action="remove-pfp">Remove photo, use emoji</button>` : `<div class="small muted" style="margin-top:6px">Or pick an emoji below</div>`}
+            </div>
+          </div>
+          <div class="emoji-pick ${p.photo ? 'dim' : ''}">${AVATARS.map(a => `<button type="button" class="${p.e === a && !p.photo ? 'on' : ''}" data-action="pick-emoji" data-e="${a}" aria-label="Avatar ${a}">${a}</button>`).join('')}</div></div>
         <label class="field"><span>Monthly “fun money” budget</span><div class="money"><input class="input" name="budget" type="number" inputmode="decimal" min="0" value="${p.budget || ''}" placeholder="e.g. 300"></div>
           <small class="muted">What you’re comfortable spending each month on wants, not bills.</small></label>
         ${S.onboarded ? `<label class="toggle-row"><div class="grow"><b>Send read receipts</b><div class="small muted">Let people see when you’ve read their private messages.</div></div>
@@ -987,7 +1014,11 @@ const actions = {
   },
   'pick-emoji': el => {
     const f = $('[data-form="profile"]');
-    S.profile.name = f.name.value; S.profile.e = el.dataset.e; renderSheet();
+    S.profile.name = f.name.value; S.profile.e = el.dataset.e; S.profile.photo = null; save(); render();
+  },
+  'remove-pfp': () => {
+    const f = $('[data-form="profile"]'); if (f) S.profile.name = f.name.value;
+    S.profile.photo = null; save(); render(); toast('Photo removed');
   },
   install: async () => {
     if (!installEvt) return;
@@ -1082,6 +1113,13 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', async e => {
   const inp = e.target;
+  if (inp.hasAttribute('data-pfp') && inp.files[0]) {
+    try {
+      const f = $('[data-form="profile"]'); if (f) S.profile.name = f.name.value;
+      S.profile.photo = await squareImage(inp.files[0]); save(); render(); toast('Looking good! 📸');
+    } catch (err) { toast('Couldn’t read that photo'); }
+    return;
+  }
   if (inp.dataset.dmMedia && inp.files[0]) {
     const file = inp.files[0], id = inp.dataset.dmMedia;
     try {
